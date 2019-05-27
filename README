@@ -1,0 +1,14 @@
+This is a hacked-up version of rsc's version of pico.
+
+Changes:
+- remove p9p shit and some bitrot
+- use mk to build binary instead of hardcoding CC/LD
+- arbitrary image sizes; set when loading or displaying an image; default
+  248x248
+- work on ABGR32 images; channels are accessed via a third 'z' coordinate
+- add &&, || operators
+- name nameless images as $1, $2,...
+- images are always written once to /tmp prior to any processing
+- fix numerous memory leaks
+- accept integers in octal and hexadecimal, as well as doubles
+- accept digits and utf in names

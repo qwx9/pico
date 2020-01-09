@@ -198,6 +198,13 @@ getname(Rune r)
 			*p++ = r;
 	*p = 0;
 	inp -= n;
+	if(runestrcmp(s, L"x") == 0
+	|| runestrcmp(s, L"X") == 0
+	|| runestrcmp(s, L"y") == 0
+	|| runestrcmp(s, L"Y") == 0
+	|| runestrcmp(s, L"z") == 0
+	|| runestrcmp(s, L"Z") == 0)
+		return s[0];
 	yylval.s = sym("%S", s);
 	if(runestrcmp(s, L"new") == 0)
 		return NEW;
@@ -269,13 +276,7 @@ yylex(void)
 	case ']':
 	case ',':
 	case '(':
-	case ')':
-	case 'x':
-	case 'X':
-	case 'y':
-	case 'Y':
-	case 'z':
-	case 'Z': return r;
+	case ')': return r;
 	case '&': return follow(r, '&', AND);
 	case '|': return follow(r, '|', OR);
 	case '*': return follow(r, '*', POW);

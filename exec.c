@@ -48,7 +48,6 @@ system(char *cmd)
 		r = -1;
 	}
 	free(w);
-	/* FIXME: clean up temp files */
 	return r;
 }
 

@@ -1,12 +1,12 @@
 ; hget http://9front.org/img/9bind.png | png -t9 > /tmp/bind
 ; hget http://9front.org/img/ninefront.bit > /tmp/nine
 
-; pixo <<EOF
+; pico
 # read in images
-r nine /tmp/nine
-r bind /tmp/bind
+!r /tmp/nine nine
+!r /tmp/bind bind
 # combine two images at an offset
-bind + (y > 100 ? nine[x,y-100,z] : 0)
+bind + (y > 100 ? nine[x,y-100] : 0)
 # extract red and alpha channels
 z == 3 ? bind : z == 0 ? bind : 0
 # halve color intensity
@@ -15,15 +15,14 @@ z < 3 ? bind/2 : Z
 bind[x,y,0] + bind[x,y,1] + bind[x,y,2] == 0 && z == 3 ? 0 : bind
 # set black pixels to cyan
 bind[x,y,0] + bind[x,y,1] + bind[x,y,2] == 0 ? z == 0 ? 0 : z == 1 ? Z : z == 2 ? Z : bind : bind
-EOF
 
 
 # doug demo
-; pixo -q <<EOF
-r bind /tmp/bind
+; pico
+!r /tmp/bind bind
+# set default size to that of bind
+!s 598 879
 lerp = z != 3 ? (x < X/3 ? 0 : x > 2*X/3 ? 255 : (x-X/3)*Z/(X/3)) : Z
-rbind = bind[X-x,y,z]
+rbind = bind[X-x]	# same as bind[X-x,y,z]
 z != 3 ? (bind*lerp+rbind*(Z-lerp))/Z : Z
 z != 3 ? (rbind*lerp+bind*(Z-lerp))/Z : Z
-d
-EOF

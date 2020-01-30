@@ -1,14 +1,70 @@
-This is a hacked-up version of rsc's version of pico.
+pico: a reimplementation of rsc's implementation of pico
+========================================================
 
-Changes:
-- remove p9p shit and some bitrot
-- use mk to build binary instead of hardcoding CC/LD
-- arbitrary image sizes; set when loading or displaying an image; default
-  248x248
-- work on ABGR32 images; channels are accessed via a third 'z' coordinate
-- add &&, || operators
-- name nameless images as $1, $2,...
-- images are always written once to /tmp prior to any processing
-- fix numerous memory leaks
-- accept integers in octal and hexadecimal, as well as doubles
-- accept digits and utf in names
+A language for composing digital images
+---------------------------------------
+
+This does not really reimplement the pico[1] language, but builds on the same
+idea.
+
+rsc initially implemented a version in C and YACC[2], which parsed a simplified
+language based on pico.
+It essentially parses a simple syntax to output a C file which performed the
+specified image manipulations in an expression embedded in a simple nested loop.
+
+It was an elegant hack, and possibly worked on plan9port as well as on plan9,
+but suffered from a number of bugs and limitations preventing its use in
+practice.
+
+This repository contains in its initial commit an improved version, which
+fixed some of the bugs and added a number of features:
+
+- removal of plan9port code and fixes on some bitrot
+- numerous memory leaks fixed
+- use of mk(1) instead of hardcoding CC and LD
+- arbitrary image sizes, set from loaded images, or 248x248 by default as
+  before
+- ABGR32 images instead of GREY8 images, with channels accessible via a third
+  'z' coordinate
+- some parser changes: addition of &&, || operators, integers in octal and
+  hexadecimal notation, floating point numbers; accept digits and utf8 runes
+  in image names
+- always name all images to allow referencing them
+- some simple optimizations in the execution, such as not writing images
+  multiple times to disk, etc.
+
+However, several problems remained unfixed.
+In particular, due to the way it was specified, the parser allocated
+an exponential number of strings while processing input.
+
+This, and the need of a few other features, prompted a reimplementation,
+this time without YACC, also in the repository, and which was also
+unsatisfactory for a number of reasons.
+
+Several reimplementations later, the current pico "implementation" is merely
+an awk script, in less than half the size of the initial code.
+
+It does everything the previous versions do, and some more:
+
+- no more memory issues
+- excepting image coordinate specifications, the syntax is straight C and
+  almost any valid expression (and operator) is allowed; using libc functions
+  and definitions such as sqrt(2) or PI is also allowed
+- image coordinate specifications needn't always specify all channels
+- images are displayed via plumb(1) and subsequently page(1) instead of a
+  makeshift viewer
+- image names may be any string not containing C operators, whitespace and
+  not beginning with a digit
+- add a command for specifying default image size when no other images are
+  referenced
+- comments via #
+
+Some other features are planned as well.
+Manpage pending.
+
+
+References:
+-----------
+
+[1] http://doc.cat-v.org/unix/v10/10thEdMan/pico.pdf
+[2] Found in plan9 contrib at /n/sources/contrib/rsc/pico/

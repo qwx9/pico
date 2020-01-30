@@ -1,0 +1,258 @@
+#!/bin/rc
+fn clean{
+	rm -f /tmp/pico.^$pid^*
+}
+fn sigexit{
+	clean
+}
+fn sigint{
+	clean
+}
+
+awk '
+function show(s){
+	system("plumb -d image " path[s])
+}
+
+function newname(file, name){
+	if(name == "")
+		name = "$" length(ref)+1
+	if(!(name in ref)){
+		ref[name] = ""
+		idx[name] = length(ref)
+	}
+	path[name] = file
+	new = name
+}
+
+function command(){
+	if($1 == "!d"){
+		if(NF > 1){
+			if($2 in path)
+				show($2)
+			else
+				print "unknown name " $2
+		}else if(new != "")
+			show(new)
+		else
+			print "nothing to show"
+	}else if($1 == "!r"){
+		if(NF < 2 || NF > 3)
+			print "usage: !r path [name]"
+		else
+			newname($2, NF < 3 ? "" : $3)
+	}else if($1 == "!w"){
+		if(NF < 3)
+			print "usage: !w name path"
+		else if($2 in path)
+			system("cp " path[$2] " " $3)
+		else
+			print "unknown name " $2
+	}else if($1 == "!f"){
+		for(i in ref)
+			print idx[i] "\t" i "\t" path[i]
+	}else if($1 == "!s"){
+		if(NF < 3)
+			print "usage: !s x y"
+		else{
+			X = $2
+			Y = $3
+		}
+	}else
+		print "unknown command"
+}
+
+BEGIN{
+	X = 0
+	Y = 0
+	opx = "!-\\/:-@\\[-\\^`\\{-~"
+	namex = "[^0-9" opx "][^" opx "]*"
+	pref="/tmp/pico.'^$pid^'"
+	mkfile = pref ".mk"
+	libfile = pref ".lib.c"
+	cfile = pref ".c"
+
+	print \
+"</$objtype/mkfile\n" \
+"%.$O:Q:	%.c\n" \
+"	$CC $CFLAGS -o $target $stem.c\n" \
+pref ":Q:	" pref ".lib.$O " pref ".$O\n" \
+"	$LD -o $target $prereq\n" \
+"	$target\n" \
+"	rm -f $target " pref ".$O\n" \
+	>mkfile
+
+	print \
+"#include <u.h>\n" \
+"#include <libc.h>\n" \
+"#include <draw.h>\n" \
+"#include <memdraw.h>\n" \
+"\n" \
+"Memimage*\n" \
+"﹩read(char *file)\n" \
+"{\n" \
+"	int fd;\n" \
+"	Memimage *m, *m1;\n" \
+"	if((fd = open(file, OREAD)) < 0)\n" \
+"		sysfatal(\"open: %r\");\n" \
+"	if((m = readmemimage(fd)) == nil)\n" \
+"		sysfatal(\"readmemimage: %r\");\n" \
+"	close(fd);\n" \
+"	if(m->chan != ABGR32){\n" \
+"		m1 = allocmemimage(m->r, ABGR32);\n" \
+"		memfillcolor(m1, DBlack);\n" \
+"		memimagedraw(m1, m1->r, m, m->r.min, memopaque, ZP, S);\n" \
+"		freememimage(m);\n" \
+"		m = m1;\n" \
+"	}\n" \
+"	return m;\n" \
+"}\n\n" \
+"void\n" \
+"﹩write(Memimage *m, char *file)\n" \
+"{\n" \
+"	int fd;\n" \
+"	if((fd = create(file, OWRITE, 0666)) < 0)\n" \
+"		sysfatal(\"create: %r\");\n" \
+"	if(writememimage(fd, m) < 0)\n" \
+"		sysfatal(\"writememimage: %r\");\n" \
+"	close(fd);\n" \
+"}\n\n" \
+"uchar*\n" \
+"﹩byte(Memimage *m, int x, int y, int z)\n" \
+"{\n" \
+"	static uchar devnull;\n" \
+"	if(x < 0 || y < 0 || z < 0 || x >= Dx(m->r) || y >= Dy(m->r) || z > 3) return &devnull;\n" \
+"	return byteaddr(m, addpt(m->r.min, Pt(x,y))) + z;\n" \
+"}" \
+	>libfile
+
+	prog = \
+"#include <u.h>\n" \
+"#include <libc.h>\n" \
+"#include <draw.h>\n" \
+"#include <memdraw.h>\n" \
+"Memimage*	﹩read(char*);\n" \
+"void	﹩write(Memimage*, char*);\n" \
+"uchar*	﹩byte(Memimage*, int, int, int);\n" \
+"#define Z 255\n" \
+"#define ﹩clip(x) ((x) < 0 ? 0 : (x) > 255 ? 255 : (x))\n" \
+"void\n" \
+"main(void)\n" \
+"{\n" \
+"	int x, y, z, X, Y, T;\n" \
+"	Memimage *﹩new;\n" \
+"	if(memimageinit() < 0)\n" \
+"		sysfatal(\"initmemimage: %r\");"
+
+	prep = \
+"	for(﹩i=﹩im; ﹩i<﹩im+nelem(﹩im); ﹩i++){\n" \
+"		if(*﹩i == nil) continue;\n" \
+"		if(X < Dx((*﹩i)->r)) X = Dx((*﹩i)->r);\n" \
+"		if(Y < Dy((*﹩i)->r)) Y = Dy((*﹩i)->r);\n" \
+"	}\n" \
+"	if((﹩new = allocmemimage(Rect(0,0,X,Y), ABGR32)) == nil)\n" \
+"		sysfatal(\"allocmemimage: %r\");\n" \
+"	for(z=0; z<4; z++) for(y=0; y<Y; y++) for(x=0; x<X; x++){"
+
+	footer = \
+"		*﹩byte(﹩new, x,y,z) = ﹩clip(T);\n" \
+"	}\n" \
+"	﹩write(﹩new, out);\n" \
+"	exits(nil);\n" \
+"}"
+}
+{
+	if($1 ~ /^!.$/){
+		command()
+		next
+	}
+	gsub("[ 	]", "", $0)
+	gsub("(" namex "|=)", " & ", $0)
+	while((i = match($0, "[" opx "] +=")) != 0)
+		$0 = substr($0, 1, i) substr($0, i+RLENGTH-1)
+	gsub("[\\(\\[\\],#]", " & ", $0)
+	ntok = split($0, tok)
+	expr = ""
+	new = ""
+	gotsym = 0
+	ncomma = 0
+	for(i in ref)
+		ref[i] = ""
+	for(i=1; i<=ntok; i++){
+		if(tok[i] ~ namex && tok[i] !~ "^[XxYyZz]$"){
+			if(gotsym){
+				print "invalid syntax"
+				next
+			}else if(i < ntok && tok[i+1] == "(")
+				expr = expr " " tok[i]
+			else if(tok[i] in ref){
+				ref[tok[i]] = 1
+				expr = expr " *﹩byte(﹩im[" idx[tok[i]] "], "
+				if(i < ntok && tok[i+1] == "["){
+					i++
+					gotsym = 1
+				}else
+					expr = expr "x,y,z)"
+			}else{
+				if(i == 1 && ntok >= 3 && tok[2] == "=")
+					new = tok[i]
+				else
+					expr = expr " " tok[i]
+			}
+		}else if(tok[i] == "="){
+			if(i != 2){
+				print "invalid assignment"
+				next
+			}
+		}else if(tok[i] == "["){
+			print "invalid index"
+			next
+		}else if(tok[i] == "#")
+			break
+		else if(gotsym){
+			if(tok[i] == "]"){
+				if(ncomma == 0)
+					tok[i] = ",y,z)"
+				else if(ncomma == 1)
+					tok[i] = ",z)"
+				else
+					tok[i] = ")"
+				ncomma = 0
+				gotsym = 0
+			}else if(tok[i] == ","){
+				if(ncomma > 1){
+					print "invalid index"
+					next
+				}
+				ncomma++
+			}
+			expr = expr " " tok[i]
+		}else
+			expr = expr " " tok[i]
+	}
+	if(expr == "")
+		next
+	if(gotsym){
+		print "invalid index"
+		next
+	}
+	out = pref "." length(ref)+1 ".bit"
+	print prog >cfile
+	print \
+"\tMemimage **﹩i, *﹩im[" length(ref)+1 "];\n" \
+"\tchar *out = \"" out "\";\n" \
+"\tX = " X ";\n" \
+"\tY = " Y ";" >>cfile
+	for(i in ref)
+		if(ref[i])
+			print "\t﹩im[" idx[i] "] = ﹩read(\"" path[i] "\");\n" >>cfile
+	print prep >>cfile
+	print "\t\tT = " expr ";" >>cfile
+	print footer >>cfile
+	close(cfile)
+	if(system("mk -f " mkfile " " pref) != "0")
+		next
+	newname(out, new)
+	show(new)
+}
+'

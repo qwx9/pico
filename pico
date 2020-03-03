@@ -17,10 +17,8 @@ function show(s){
 function newname(file, name){
 	if(name == "")
 		name = "$" length(ref)+1
-	if(!(name in ref)){
-		ref[name] = ""
-		idx[name] = length(ref)
-	}
+	ref[name in ref ? name ",$" idx[name] : name] = ""
+	idx[name] = length(ref)
 	path[name] = file
 	new = name
 }
@@ -65,7 +63,7 @@ function command(){
 BEGIN{
 	X = 0
 	Y = 0
-	opx = "!-\\/:-@\\[-\\^`\\{-~"
+	opx = "!-#%-\\/:-@\\[-\\^`\\{-~"
 	namex = "[^0-9" opx "][^" opx "]*"
 	pref="/tmp/pico.'^$pid^'"
 	mkfile = pref ".mk"
@@ -185,6 +183,8 @@ pref ":Q:	" pref ".lib.$O " pref ".$O\n" \
 				next
 			}else if(i < ntok && tok[i+1] == "(")
 				expr = expr " " tok[i]
+			else if(i == 1 && ntok >= 3 && tok[2] == "=")
+				new = tok[i]
 			else if(tok[i] in ref){
 				ref[tok[i]] = 1
 				expr = expr " *﹩byte(﹩im[" idx[tok[i]] "], "
@@ -193,12 +193,8 @@ pref ":Q:	" pref ".lib.$O " pref ".$O\n" \
 					gotsym = 1
 				}else
 					expr = expr "x,y,z)"
-			}else{
-				if(i == 1 && ntok >= 3 && tok[2] == "=")
-					new = tok[i]
-				else
-					expr = expr " " tok[i]
-			}
+			}else
+				expr = expr " " tok[i]
 		}else if(tok[i] == "="){
 			if(i != 2){
 				print "invalid assignment"
